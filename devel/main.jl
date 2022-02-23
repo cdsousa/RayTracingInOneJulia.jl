@@ -1,6 +1,7 @@
 using Images
 using CUDA, KernelAbstractions, CUDAKernels
 using Tullio
+using ChangePrecision
 
 function main()
 
@@ -16,11 +17,13 @@ function main()
 
     # Render
 
-    function render(i, j)
-        r = (j-1) / (image_width-1)
-        g = (image_height-i) / (image_height-1)
-        b = 0.25
-        RGB(r,g,b)
+    @changeprecision Float32 begin
+        function render(i, j)
+            r = (j-1) / (image_width-1)
+            g = (image_height-i) / (image_height-1)
+            b = 0.25
+            RGB(r,g,b)
+        end
     end
 
     @time begin
