@@ -26,12 +26,18 @@ module RayTracingInOneJulia
             b = 2.0 * (oc ⋅ r.dir)
             c = (oc ⋅ oc) - radius^2
             discriminant = b*b - 4*a*c
-            return discriminant > 0
+            if discriminant <= 0
+                return nothing
+            else
+                return (-b - sqrt(discriminant) ) / (2.0*a)
+            end
         end
 
         function ray_color(r::Ray)
-            if hit_sphere(Point3(0.0,0.0,-1.0), 0.5, r)
-                return RGB(1.0, 0.0, 0.0)
+            t = hit_sphere(Point3(0.0,0.0,-1.0), 0.5, r)
+            if !isnothing(t)
+                n = normalize(at(r, t) - Vec3(0.0,0.0,-1.0))
+                return 0.5 * RGB(n.x + 1.0, n.y + 1.0, n.z + 1.0)
             end
             unit_direction = normalize(r.dir)
             t = 0.5 * (unit_direction.y + 1.0)
@@ -100,4 +106,8 @@ main(false)
 main(true)
 
 main(false)
+main(false)
+main(false)
+main(true)
+main(true)
 main(true)
