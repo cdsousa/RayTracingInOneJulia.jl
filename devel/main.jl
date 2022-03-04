@@ -1,6 +1,7 @@
 module RayTracingInOneJulia
 
     using LinearAlgebra
+    using LinearAlgebra: norm_sqr
     using StaticArrays
     using Images
     using CUDA, KernelAbstractions, CUDAKernels
@@ -22,14 +23,14 @@ module RayTracingInOneJulia
 
         function hit_sphere(center, radius, r::Ray)
             oc = r.orig - center
-            a = r.dir ⋅ r.dir
-            b = 2.0 * (oc ⋅ r.dir)
-            c = (oc ⋅ oc) - radius^2
-            discriminant = b*b - 4*a*c
+            a = norm_sqr(r.dir)
+            half_b = oc ⋅ r.dir
+            c = norm_sqr(oc) - radius^2
+            discriminant = half_b^2 - a*c
             if discriminant <= 0
                 return nothing
             else
-                return (-b - sqrt(discriminant) ) / (2.0*a)
+                return (-half_b - sqrt(discriminant) ) / a
             end
         end
 
