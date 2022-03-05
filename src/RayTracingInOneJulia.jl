@@ -133,17 +133,17 @@ function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, sa
 end
 
 function render!(image::AbstractArray{RGB{T}}, world, cam, image_width, image_height, samples_per_pixel) where T
-    @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
-    # @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel)
-    #     i, j = @index(Global, NTuple)
-    #     image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
-    # end
-    # if isa(image, CuArray)
-    #     wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
-    # else
-    #     wait(k(CPU())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
-    # end
-    # image
+    # @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
+    @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel)
+        i, j = @index(Global, NTuple)
+        image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
+    end
+    if isa(image, CuArray)
+        wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
+    else
+        wait(k(CPU())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
+    end
+    image
 end
 
 end
