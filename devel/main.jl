@@ -31,15 +31,15 @@ function main(use_cuda=true)
 
         # Camera
 
-        cam = Camera()
+        cam = Camera{Float32}()
 
         # Render
 
         @time begin
             render!(image, world, cam, image_width, image_height, samples_per_pixel)
             ArrType==CuArray && CUDA.synchronize()
-            image = ArrType != Array ? Array(image) : image
         end
+        image = ArrType != Array ? Array(image) : image
 
         # Save
 

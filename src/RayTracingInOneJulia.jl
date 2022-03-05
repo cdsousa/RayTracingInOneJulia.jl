@@ -52,16 +52,16 @@ abstract type Hittable end
     end
 
 
-function Camera()
-    aspect_ratio = 16.0 / 9.0
-    viewport_height = 2.0
+function Camera{T}() where T
+    aspect_ratio = T(16) / T(9)
+    viewport_height = T(2)
     viewport_width = aspect_ratio * viewport_height
-    focal_length = 1.0
+    focal_length = T(1)
 
-    origin = Point3(0.0, 0.0, 0.0)
-    horizontal = Vec3(viewport_width, 0.0, 0.0)
-    vertical = Vec3(0.0, viewport_height, 0.0)
-    lower_left_corner = origin - horizontal/2 - vertical/2 - Vec3(0.0, 0.0, focal_length)
+    origin = Point3{T}(0, 0, 0)
+    horizontal = Vec3{T}(viewport_width, 0, 0)
+    vertical = Vec3{T}(0, viewport_height, 0)
+    lower_left_corner = origin - horizontal/T(2) - vertical/T(2) - Vec3{T}(0, 0, focal_length)
 
     return Camera(origin, lower_left_corner, horizontal, vertical)
 end
@@ -111,32 +111,32 @@ function hit(hitables::AbstractArray, r::Ray, t_min, t_max)
     return rec
 end
 
-function ray_color(r::Ray, world)
-    rec = hit(world, r, 0.0, Inf)
+function ray_color(r::Ray{T}, world) where T
+    rec = hit(world, r, T(0), T(Inf))
     if !isnothing(rec)
-        return 0.5 * (RGB(rec.normal[1], rec.normal[2], rec.normal[3]) + RGB(1.0))
+        return T(0.5) * (RGB{T}(rec.normal[1], rec.normal[2], rec.normal[3]) + RGB{T}(1))
     end
     unit_direction = normalize(r.dir)
-    t = 0.5 * (unit_direction.y + 1.0)
-    return (1.0-t) * RGB(1.0, 1.0, 1.0) + t * RGB(0.5, 0.7, 1.0)
+    t = T(0.5) * (unit_direction.y + T(1))
+    return (T(1.0)-t) * RGB{T}(1, 1, 1) + t * RGB{T}(0.5, 0.7, 1)
 end
 
-function render_pixel(i, j, world, cam, image_width, image_height, samples_per_pixel)
-    pixel_color = RGB(0.0)
-    for _=1:samples_per_pixel
-        u = (j-1+rand()) / (image_width-1)
-        v = (image_height-1 - (i-1+rand())) / (image_height-1)
+function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, samples_per_pixel) where T
+    pixel_color = RGB{T}(0)
+    for _=Int32(1):samples_per_pixel
+        u = (j-1+rand(T)) / (image_width-1)
+        v = (image_height-1 - (i-1+rand(T))) / (image_height-1)
         r = get_ray(cam, u, v)
         pixel_color  += ray_color(r, world)
     end
-    return clamp01(pixel_color/samples_per_pixel)
+    return clamp01(pixel_color/T(samples_per_pixel))
 end
 
-function render!(image, world, cam, image_width, image_height, samples_per_pixel)
-    @tullio image[i,j] = render_pixel(i, j, world, cam, image_width, image_height, samples_per_pixel)
+function render!(image::AbstractArray{RGB{T}}, world, cam, image_width, image_height, samples_per_pixel) where T
+    @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
     # @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel)
     #     i, j = @index(Global, NTuple)
-    #     image[i, j] = render_pixel(i, j, world, cam, image_width, image_height, samples_per_pixel)
+    #     image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
     # end
     # if isa(image, CuArray)
     #     wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
