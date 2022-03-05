@@ -8,10 +8,19 @@ module RayTracingInOneJulia
     using Tullio
     using ChangePrecision
 
+    CUDA.allowscalar(false)
 
 
     const Vec3 = SVector{3, T} where T
     const Point3 = Vec3
+
+
+    struct Camera{T}
+        origin::Point3{T}
+        lower_left_corner::Point3{T}
+        horizontal::Vec3{T}
+        vertical::Vec3{T}
+    end
 
     struct Ray{T}
         orig::Point3{T}
@@ -33,11 +42,28 @@ module RayTracingInOneJulia
 
     abstract type Hittable end
 
-    @changeprecision Float32 begin
-
         struct Sphere{T} <: Hittable
             center::Point3{T}
             radius::T
+        end
+
+    @changeprecision Float32 begin
+
+        function Camera()
+            aspect_ratio = 16.0 / 9.0
+            viewport_height = 2.0
+            viewport_width = aspect_ratio * viewport_height
+            focal_length = 1.0
+
+            origin = Point3(0.0, 0.0, 0.0)
+            horizontal = Vec3(viewport_width, 0.0, 0.0)
+            vertical = Vec3(0.0, viewport_height, 0.0)
+            lower_left_corner = origin - horizontal/2 - vertical/2 - Vec3(0.0, 0.0, focal_length)
+
+            return Camera(origin, lower_left_corner, horizontal, vertical)
+        end
+        function get_ray(cam, u, v)
+            return Ray(cam.origin, cam.lower_left_corner + u*cam.horizontal + v*cam.vertical - cam.origin)
         end
 
         function hit(s::Sphere, r::Ray, t_min, t_max)::Union{HitRecord, Nothing}
@@ -100,8 +126,9 @@ module RayTracingInOneJulia
             aspect_ratio = 16 / 9
             image_width = 400
             image_height = floor(Int, image_width / aspect_ratio)
+            samples_per_pixel = 100
 
-            if use_cuda[]
+            if use_cuda
                 ArrType = CuArray
             else
                 ArrType = Array
@@ -115,22 +142,19 @@ module RayTracingInOneJulia
 
             # Camera
 
-            viewport_height = 2.0
-            viewport_width = aspect_ratio * viewport_height
-            focal_length = 1.0
-
-            origin = Point3(0.0, 0.0, 0.0)
-            horizontal = Vec3(viewport_width, 0.0, 0.0)
-            vertical = Vec3(0, viewport_height, 0.0)
-            lower_left_corner = origin - horizontal/2 - vertical/2 - Vec3(0.0, 0.0, focal_length)
+            cam = Camera()
 
             # Render
 
             function render_pixel(i, j)
-                u = (j-1) / (image_width-1)
-                v = (image_height-i) / (image_height-1)
-                r = Ray(origin, lower_left_corner + u*horizontal + v*vertical - origin)
-                ray_color(r, world)
+                pixel_color = RGB(0.0)
+                for _=1:samples_per_pixel
+                    u = (j-1+rand()) / (image_width-1)
+                    v = (image_height-1 - (i-1+rand())) / (image_height-1)
+                    r = get_ray(cam, u, v)
+                    pixel_color  += ray_color(r, world)
+                end
+                return clamp01(pixel_color/samples_per_pixel)
             end
 
             @time begin
