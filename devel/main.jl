@@ -8,6 +8,8 @@ module RayTracingInOneJulia
     using Tullio
     using ChangePrecision
 
+
+
     const Vec3 = SVector{3, T} where T
     const Point3 = Vec3
 
@@ -17,28 +19,73 @@ module RayTracingInOneJulia
     end
     at(r::Ray, t) = r.orig + t * r.dir
 
-    using ChangePrecision
+    struct HitRecord{T}
+        p::Point3{T}
+        normal::Vec3{T}
+        t::T
+        front_face::Bool
+    end
+    function HitRecord(r::Ray, p, t, outward_normal)
+        front_face = r.dir ⋅ outward_normal < 0
+        normal = front_face ? outward_normal : -outward_normal
+        return HitRecord(p, normal, t, front_face)
+    end
+
+    abstract type Hittable end
 
     @changeprecision Float32 begin
 
-        function hit_sphere(center, radius, r::Ray)
-            oc = r.orig - center
+        struct Sphere{T} <: Hittable
+            center::Point3{T}
+            radius::T
+        end
+
+        function hit(s::Sphere, r::Ray, t_min, t_max)::Union{HitRecord, Nothing}
+            oc = r.orig - s.center
             a = norm_sqr(r.dir)
             half_b = oc ⋅ r.dir
-            c = norm_sqr(oc) - radius^2
+            c = norm_sqr(oc) - s.radius^2
             discriminant = half_b^2 - a*c
             if discriminant <= 0
                 return nothing
-            else
-                return (-half_b - sqrt(discriminant) ) / a
             end
+            sqrtd = sqrt(discriminant)
+
+            # Find the nearest root that lies in the acceptable range.
+            root = (-half_b - sqrtd) / a
+            if root < t_min || t_max < root
+                root = (-half_b + sqrtd) / a
+                if root < t_min || t_max < root
+                    return nothing
+                end
+            end
+
+            t = root
+            p = at(r, t)
+            outward_normal = (p - s.center) / s.radius
+
+            return HitRecord(r, p, t, outward_normal)
         end
 
-        function ray_color(r::Ray)
-            t = hit_sphere(Point3(0.0,0.0,-1.0), 0.5, r)
-            if !isnothing(t)
-                n = normalize(at(r, t) - Vec3(0.0,0.0,-1.0))
-                return 0.5 * RGB(n.x + 1.0, n.y + 1.0, n.z + 1.0)
+        function hit(hitables::AbstractArray, r::Ray, t_min, t_max)
+            rec = nothing
+            closest_so_far = t_max
+
+            for object in hitables
+                temp_rec = hit(object, r, t_min, closest_so_far)
+                if !isnothing(temp_rec)
+                    closest_so_far = temp_rec.t
+                    rec = temp_rec
+                end
+            end
+
+            return rec
+        end
+
+        function ray_color(r::Ray, world)
+            rec = hit(world, r, 0.0, Inf)
+            if !isnothing(rec)
+                return 0.5 * (RGB(rec.normal[1], rec.normal[2], rec.normal[3]) + RGB(1.0))
             end
             unit_direction = normalize(r.dir)
             t = 0.5 * (unit_direction.y + 1.0)
@@ -53,7 +100,7 @@ module RayTracingInOneJulia
             aspect_ratio = 16 / 9
             image_width = 400
             image_height = floor(Int, image_width / aspect_ratio)
-    #
+
             if use_cuda[]
                 ArrType = CuArray
             else
@@ -61,6 +108,10 @@ module RayTracingInOneJulia
             end
 
             image = ArrType{RGB{Float32}}(undef, image_height, image_width)
+
+            # World
+
+            world = ArrType([Sphere(Point3(0.0,0.0,-1.0), 0.5), Sphere(Point3(0.0,-100.5,-1.0), 100.0)])
 
             # Camera
 
@@ -75,17 +126,17 @@ module RayTracingInOneJulia
 
             # Render
 
-            function render(i, j)
+            function render_pixel(i, j)
                 u = (j-1) / (image_width-1)
                 v = (image_height-i) / (image_height-1)
                 r = Ray(origin, lower_left_corner + u*horizontal + v*vertical - origin)
-                ray_color(r)
+                ray_color(r, world)
             end
 
             @time begin
-                @tullio image[i,j] = render(i,j)
+                @tullio image[i,j] = render_pixel(i, j)
                 ArrType==CuArray && CUDA.synchronize()
-                image = ArrType!=Array ? Array(image) : image
+                image = ArrType != Array ? Array(image) : image
             end
 
             # Save
