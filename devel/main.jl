@@ -42,12 +42,13 @@ function main(use_cuda=true)
             render!(image, world, cam, image_width, image_height, samples_per_pixel, max_depth)
             ArrType==CuArray && CUDA.synchronize()
         end
-        image = ArrType != Array ? Array(image) : image
-
         # @btime begin
         #     render!($image, $world, $cam, $image_width, $image_height, $samples_per_pixel, $max_depth)
         #     $ArrType==CuArray && CUDA.synchronize()
         # end
+
+        image = ArrType != Array ? Array(image) : image
+
 
         # Save
 
@@ -61,6 +62,7 @@ end
 
 main(false)
 main(true)
+# #
 
 main(false)
 main(false)
