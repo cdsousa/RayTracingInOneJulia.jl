@@ -75,7 +75,7 @@ function hit(s::Sphere, r::Ray, t_min, t_max)::Union{HitRecord, Nothing}
     half_b = oc ⋅ r.dir
     c = norm_sqr(oc) - s.radius^2
     discriminant = half_b^2 - a*c
-    if discriminant <= 0
+    if discriminant < 0
         return nothing
     end
     sqrtd = sqrt(discriminant)
@@ -111,37 +111,52 @@ function hit(hitables::AbstractArray, r::Ray, t_min, t_max)
     return rec
 end
 
-function ray_color(r::Ray{T}, world) where T
-    rec = hit(world, r, T(0), T(Inf))
-    if !isnothing(rec)
-        return T(0.5) * (RGB{T}(rec.normal[1], rec.normal[2], rec.normal[3]) + RGB{T}(1))
+function ray_color(r::Ray{T}, world, max_depth) where T
+    depth = max_depth
+    attenuation = T(1)
+    while true
+        if depth <= 0
+            return RGB{T}(0)
+        end
+        rec = hit(world, r, T(0.001), T(Inf))
+        if !isnothing(rec)
+            # d = rec.normal + normalize(randn(Vec3{T}))
+            d = randn(Vec3{T}) ; d = d ⋅ rec.normal > 0 ? d : -d
+            target = rec.p + d
+            r = Ray{T}(rec.p, target - rec.p)
+            attenuation = attenuation * T(0.5)
+            depth -= one(depth)
+        else
+            unit_direction = normalize(r.dir)
+            t = T(0.5) * (unit_direction.y + T(1))
+            return attenuation * ((T(1.0)-t) * RGB{T}(1, 1, 1) + t * RGB{T}(0.5, 0.7, 1))
+        end
     end
-    unit_direction = normalize(r.dir)
-    t = T(0.5) * (unit_direction.y + T(1))
-    return (T(1.0)-t) * RGB{T}(1, 1, 1) + t * RGB{T}(0.5, 0.7, 1)
 end
 
-function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, samples_per_pixel) where T
+function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, samples_per_pixel, max_depth) where T
     pixel_color = RGB{T}(0)
     for _=Int32(1):samples_per_pixel
         u = (j-1+rand(T)) / (image_width-1)
-        v = (image_height-1 - (i-1+rand(T))) / (image_height-1)
+        v = (image_height-i+rand(T)) / (image_height-1)
         r = get_ray(cam, u, v)
-        pixel_color  += ray_color(r, world)
+        pixel_color += ray_color(r, world, max_depth)
     end
-    return clamp01(pixel_color/T(samples_per_pixel))
+    pixel_color = (1/samples_per_pixel) * pixel_color
+    pixel_color = RGB(sqrt(pixel_color.r), sqrt(pixel_color.g), sqrt(pixel_color.b))
+    return clamp01(pixel_color)
 end
 
-function render!(image::AbstractArray{RGB{T}}, world, cam, image_width, image_height, samples_per_pixel) where T
-    # @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
-    @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel)
+function render!(image::AbstractArray{RGB{T}}, world, cam, image_width, image_height, samples_per_pixel, max_depth) where T
+    # @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel), Int32(max_depth))
+    @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel, max_depth)
         i, j = @index(Global, NTuple)
-        image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel))
+        image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel), Int32(max_depth))
     end
     if isa(image, CuArray)
-        wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
+        wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, max_depth, ndrange=size(image)) )
     else
-        wait(k(CPU())(image, world, cam, image_width, image_height, samples_per_pixel, ndrange=size(image)) )
+        wait(k(CPU())(image, world, cam, image_width, image_height, samples_per_pixel, max_depth, ndrange=size(image)) )
     end
     image
 end
