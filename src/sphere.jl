@@ -2,9 +2,10 @@ using LinearAlgebra: norm_sqr
 
 export Sphere
 
-struct Sphere{T} <: Hittable
+struct Sphere{T, M} <: Hittable
     center::Point3{T}
     radius::T
+    material::M
 end
 
 function hit(s::Sphere, r::Ray, t_min, t_max)::Union{HitRecord, Nothing}
@@ -31,5 +32,5 @@ function hit(s::Sphere, r::Ray, t_min, t_max)::Union{HitRecord, Nothing}
     p = at(r, t)
     outward_normal = (p - s.center) / s.radius
 
-    return HitRecord(r, p, t, outward_normal)
+    return HitRecord(r, p, outward_normal, s.material, t)
 end

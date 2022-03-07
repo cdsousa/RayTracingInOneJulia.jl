@@ -18,6 +18,7 @@ const Point3 = Vec3
 
 include("ray.jl")
 include("hittable.jl")
+include("material.jl")
 include("sphere.jl")
 include("camera.jl")
 
@@ -26,23 +27,25 @@ export render!
 
 function ray_color(r::Ray{T}, world, max_depth) where T
     depth = max_depth
-    attenuation = T(1)
+    attenuation = RGB{T}(1)
     while true
         if depth <= 0
             return RGB{T}(0)
         end
         rec = hit(world, r, T(0.001), T(Inf))
         if !isnothing(rec)
-            # d = rec.normal + normalize(randn(Vec3{T}))
-            d = randn(Vec3{T}) ; d = d ⋅ rec.normal > 0 ? d : -d
-            target = rec.p + d
-            r = Ray{T}(rec.p, target - rec.p)
-            attenuation = attenuation * T(0.5)
-            depth -= one(depth)
+            scat_rec = scatter(rec.material, r, rec)
+            if !isnothing(scat_rec)
+                attenuation = attenuation ⊙ scat_rec.attenuation
+                r = scat_rec.scattered
+                depth -= one(depth)
+            else
+                return RGB{T}(0)
+            end
         else
             unit_direction = normalize(r.dir)
             t = T(0.5) * (unit_direction.y + T(1))
-            return attenuation * ((T(1.0)-t) * RGB{T}(1, 1, 1) + t * RGB{T}(0.5, 0.7, 1))
+            return attenuation ⊙ ((T(1.0)-t) * RGB{T}(1, 1, 1) + t * RGB{T}(0.5, 0.7, 1))
         end
     end
 end
