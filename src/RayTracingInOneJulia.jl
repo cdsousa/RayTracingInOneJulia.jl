@@ -57,6 +57,7 @@ function write_color(pixel_color, samples_per_pixel)
 end
 
 function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, samples_per_pixel, max_depth) where T
+    (i, j, image_width, image_height) = T.((i, j, image_width, image_height))
     pixel_color = RGB{T}(0)
     for _ in Base.OneTo(samples_per_pixel)
         u = (j-1+rand(T)) / (image_width-1)
@@ -68,17 +69,7 @@ function render_pixel(::Type{T}, i, j, world, cam, image_width, image_height, sa
 end
 
 function render!(image::AbstractArray{RGB{T}}, world, cam, image_width, image_height, samples_per_pixel, max_depth) where T
-    # @tullio image[i,j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel), Int32(max_depth))
-    @kernel function k(image, world, cam, image_width, image_height, samples_per_pixel, max_depth)
-        i, j = @index(Global, NTuple)
-        image[i, j] = render_pixel(T, T(i), T(j), world, cam, T(image_width), T(image_height), Int32(samples_per_pixel), Int32(max_depth))
-    end
-    if isa(image, CuArray)
-        wait(k(CUDADevice())(image, world, cam, image_width, image_height, samples_per_pixel, max_depth, ndrange=size(image)) )
-    else
-        wait(k(CPU())(image, world, cam, image_width, image_height, samples_per_pixel, max_depth, ndrange=size(image)) )
-    end
-    image
+    @tullio image[i,j] = render_pixel(T, i, j, $world, cam, image_width, image_height, Int32(samples_per_pixel), Int32(max_depth))
 end
 
 
