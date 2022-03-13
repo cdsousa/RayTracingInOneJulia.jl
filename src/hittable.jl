@@ -1,3 +1,4 @@
+export HitRecord
 
 abstract type Hittable end
 

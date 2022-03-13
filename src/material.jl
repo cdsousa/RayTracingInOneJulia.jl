@@ -1,5 +1,5 @@
 
-export Lambertian, Metal
+export Material, Lambertian, Metal, scatter
 
 
 abstract type Material end

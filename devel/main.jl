@@ -3,12 +3,17 @@ using Images
 using StaticArrays
 using ChangePrecision
 using BenchmarkTools
+using Setfield
 using CUDA
 
 using RayTracingInOneJulia
 
+import RayTracingInOneJulia.scatter
 
 UnionMaterial = Union{Lambertian{T}, Metal{T}} where T
+struct UnionMaterialWrapper{T}; _::UnionMaterial{T}; end
+scatter(r_in::Ray{T}, rec::HitRecord{T, UnionMaterialWrapper{T}}) where {T} = scatter(r_in, @set rec.material = rec.material._)
+
 
 function main(use_cuda=true)
     @changeprecision Float32 begin
@@ -38,10 +43,10 @@ function main(use_cuda=true)
         material_right  = Metal(RGB(0.8, 0.6, 0.2))
 
         world = ArrType([
-            Sphere{T, UnionMaterial{T}}(Point3( 0.0, -100.5, -1.0), 100.0, material_ground),
-            Sphere{T, UnionMaterial{T}}(Point3( 0.0,    0.0, -1.0),   0.5, material_center),
-            Sphere{T, UnionMaterial{T}}(Point3(-1.0,    0.0, -1.0),   0.5, material_left),
-            Sphere{T, UnionMaterial{T}}(Point3( 1.0,    0.0, -1.0),   0.5, material_right),
+            Sphere(Point3( 0.0, -100.5, -1.0), 100.0, UnionMaterialWrapper(material_ground)),
+            Sphere(Point3( 0.0,    0.0, -1.0),   0.5, UnionMaterialWrapper(material_center)),
+            Sphere(Point3(-1.0,    0.0, -1.0),   0.5, UnionMaterialWrapper(material_left)),
+            Sphere(Point3( 1.0,    0.0, -1.0),   0.5, UnionMaterialWrapper(material_right)),
             ])
 
         # Camera
