@@ -34,7 +34,7 @@ function ray_color(r::Ray{T}, world, max_depth) where T
         end
         rec = hit(world, r, T(0.001), T(Inf))
         if !isnothing(rec)
-            scat_rec = scatter(rec.material, r, rec)
+            scat_rec = scatter(r, rec)
             if !isnothing(scat_rec)
                 attenuation = attenuation ⊙ scat_rec.attenuation
                 r = scat_rec.scattered
