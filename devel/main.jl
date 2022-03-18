@@ -39,8 +39,8 @@ function main(use_cuda=true)
 
         material_ground = Lambertian(RGB(0.8, 0.8, 0.0))
         material_center = Lambertian(RGB(0.7, 0.3, 0.3))
-        material_left   = Metal(RGB(0.8, 0.8, 0.8))
-        material_right  = Metal(RGB(0.8, 0.6, 0.2))
+        material_left   = Metal(RGB(0.8, 0.8, 0.8), 0.3)
+        material_right  = Metal(RGB(0.8, 0.6, 0.2), 1.0)
 
         world = ArrType([
             Sphere(Point3( 0.0, -100.5, -1.0), 100.0, UnionMaterialWrapper(material_ground)),
