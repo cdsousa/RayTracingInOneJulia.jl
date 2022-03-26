@@ -1,5 +1,5 @@
 
-export Material, Lambertian, Metal, scatter
+export Material, Lambertian, Metal, Dielectric, scatter
 
 
 function random_unit_vector(::Type{T}) where T
@@ -43,4 +43,25 @@ function scatter(r_in::Ray{T}, rec::HitRecord{T, Metal{T}}) where T
     else
         return nothing
     end
+end
+
+struct Dielectric{T} <: Material
+    ir::T  # Index of Refraction
+end
+
+function refract(uv::Vec3{T}, n, etai_over_etat) where T
+    cos_theta = min(-uv ⋅ n, T(1))
+    r_out_perp =  etai_over_etat * (uv + cos_theta*n)
+    r_out_parallel = -sqrt(abs(T(1) - norm_sqr(r_out_perp))) * n
+    return r_out_perp + r_out_parallel
+end
+
+
+function scatter(r_in::Ray{T}, rec::HitRecord{T, Dielectric{T}}) where T
+    attenuation = RGB(T(1))
+    refraction_ratio = rec.front_face ? (T(1)/rec.material.ir) : rec.material.ir
+    unit_direction = normalize(r_in.dir)
+    refracted = refract(unit_direction, rec.normal, refraction_ratio)
+    scattered = Ray(rec.p, refracted)
+    return (;attenuation, scattered)
 end

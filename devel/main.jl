@@ -10,7 +10,7 @@ using RayTracingInOneJulia
 
 import RayTracingInOneJulia.scatter
 
-UnionMaterial = Union{Lambertian{T}, Metal{T}} where T
+UnionMaterial = Union{Lambertian{T}, Metal{T}, Dielectric{T}} where T
 struct UnionMaterialWrapper{T}; _::UnionMaterial{T}; end
 scatter(r_in::Ray{T}, rec::HitRecord{T, UnionMaterialWrapper{T}}) where {T} = scatter(r_in, @set rec.material = rec.material._)
 
@@ -38,8 +38,8 @@ function main(use_cuda=true)
         # World
 
         material_ground = Lambertian(RGB(0.8, 0.8, 0.0))
-        material_center = Lambertian(RGB(0.7, 0.3, 0.3))
-        material_left   = Metal(RGB(0.8, 0.8, 0.8), 0.3)
+        material_center = Dielectric(1.5)
+        material_left   = Dielectric(1.5)
         material_right  = Metal(RGB(0.8, 0.6, 0.2), 1.0)
 
         world = ArrType([
@@ -76,6 +76,7 @@ function main(use_cuda=true)
     end # @changeprecision
 end
 
+# #
 
 main(false)
 main(true)
