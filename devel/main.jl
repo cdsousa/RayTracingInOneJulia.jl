@@ -11,7 +11,7 @@ using RayTracingInOneJulia
 import RayTracingInOneJulia.scatter
 
 # Union material approach
-UnionMaterial = Union{Lambertian{T}, Metal{T}} where T
+UnionMaterial = Union{Lambertian{T}, Metal{T}, Dielectric{T}} where T
 struct UnionMaterialWrapper{T}; _::UnionMaterial{T}; end
 scatter(r_in::Ray{T}, rec::HitRecord{T, UnionMaterialWrapper{T}}) where {T} = scatter(r_in, @set rec.material = rec.material._)
 
@@ -19,15 +19,18 @@ scatter(r_in::Ray{T}, rec::HitRecord{T, UnionMaterialWrapper{T}}) where {T} = sc
 scatter(r_in::Ray{T}, rec::HitRecord{T, <:NamedTuple{(:list,:idx,)}}) where {T} = scatter(r_in, @set rec.material = rec.material.list[rec.material.idx])
 
 # United material type approach
-@enum UnitedMaterialType  UnitedMaterialLambertian UnitedMaterialMetal
-struct UnitedMaterial{T}; typ::UnitedMaterialType; albedo::RGB{T}; fuzz::T; end
+@enum UnitedMaterialType  UnitedMaterialLambertian UnitedMaterialMetal UnitedMaterialDielectric
+struct UnitedMaterial{T}; typ::UnitedMaterialType; albedo::RGB{T}; fuzz_ir::T; end
 UnitedMaterial(mat::Lambertian{T}) where T = UnitedMaterial{T}(UnitedMaterialLambertian, mat.albedo, T(0))
 UnitedMaterial(mat::Metal{T}) where T = UnitedMaterial{T}(UnitedMaterialMetal, mat.albedo, mat.fuzz)
+UnitedMaterial(mat::Dielectric{T}) where T = UnitedMaterial{T}(UnitedMaterialDielectric, RGB(T(0)), mat.ir)
 function specialize_on_material(f, mat::UnitedMaterial)
     if mat.typ == UnitedMaterialLambertian
         return f(Lambertian(mat.albedo))
     elseif mat.typ == UnitedMaterialMetal
-        return f(Metal(mat.albedo, mat.fuzz))
+        return f(Metal(mat.albedo, mat.fuzz_ir))
+    elseif mat.typ == UnitedMaterialDielectric
+        return f(Dielectric(mat.fuzz_ir))
     end
 end
 scatter(r_in::Ray, rec::HitRecord{<:Any, <:UnitedMaterial}) = specialize_on_material(m->scatter(r_in, @set rec.material=m), rec.material)
@@ -56,8 +59,8 @@ function main(use_cuda, material_approach=1)
         # World
 
         material_ground = Lambertian(RGB(0.8, 0.8, 0.0))
-        material_center = Lambertian(RGB(0.7, 0.3, 0.3))
-        material_left   = Metal(RGB(0.8, 0.8, 0.8), 0.3)
+        material_center = Dielectric(1.5)
+        material_left   = Dielectric(1.5)
         material_right  = Metal(RGB(0.8, 0.6, 0.2), 1.0)
         if material_approach == 1
             world = ArrType([
@@ -114,7 +117,7 @@ end
 
 # #
 
-matapproach = 1
+matapproach = 3
 
 main(false, matapproach)
 main(true, matapproach)
